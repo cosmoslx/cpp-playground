@@ -64,32 +64,30 @@ struct Task
 
         Task get_return_object()
         {
-            return Task(std::coroutine_handle<promise_type>::from_promise(*this));
+            //return Task(std::coroutine_handle<promise_type>::from_promise(*this));
+            return Task{this};
         }
 
         std::suspend_never initial_suspend() { return {}; }
 
         std::suspend_always final_suspend() noexcept { return {}; }
         
-        // void return_void() {}
         std::suspend_always yield_value(int value)
         {
             current_value = value;
             return {};
         }
 
+        // void return_void() {}
         void return_value(int value) { current_value = value; }
 
         void unhandled_exception() { std::exit(1); }
     };
 
 
-    Task(std::coroutine_handle<promise_type> h) : handle(h) {}
-    ~Task()
-    {
-        if (handle)
-            handle.destroy();
-    }
+    //Task(std::coroutine_handle<promise_type> h) : handle(h) {}
+    Task(promise_type *promise) : handle(std::coroutine_handle<promise_type>::from_promise(*promise)) {}
+    ~Task() { if (handle) handle.destroy(); }
 
     int get_value() { return handle.promise().current_value; }
 
