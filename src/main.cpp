@@ -4,8 +4,7 @@
 #include <array>
 #include <coroutine>
 
-
-// ======== basic ========= 
+// ======== basic =========
 
 using Notify = void(int, int);
 using pNotify = void (*)(int, int);
@@ -64,14 +63,14 @@ struct Task
 
         Task get_return_object()
         {
-            //return Task(std::coroutine_handle<promise_type>::from_promise(*this));
+            // return Task(std::coroutine_handle<promise_type>::from_promise(*this));
             return Task{this};
         }
 
         std::suspend_never initial_suspend() { return {}; }
 
         std::suspend_always final_suspend() noexcept { return {}; }
-        
+
         std::suspend_always yield_value(int value)
         {
             current_value = value;
@@ -84,10 +83,13 @@ struct Task
         void unhandled_exception() { std::exit(1); }
     };
 
-
-    //Task(std::coroutine_handle<promise_type> h) : handle(h) {}
+    // Task(std::coroutine_handle<promise_type> h) : handle(h) {}
     Task(promise_type *promise) : handle(std::coroutine_handle<promise_type>::from_promise(*promise)) {}
-    ~Task() { if (handle) handle.destroy(); }
+    ~Task()
+    {
+        if (handle)
+            handle.destroy();
+    }
 
     int get_value() { return handle.promise().current_value; }
 
@@ -100,20 +102,90 @@ struct Task
 
 /// @brief coroutine function, function using Task as a return type became a coroutine
 /// @return coroutine return object
-Task coroutineFunction() {
+Task coroutineFunction()
+{
     co_yield 1;
     co_yield 2;
     co_yield 3;
     co_return -1;
 }
 
-void usage_hello_coroutine() {
+void usage_hello_coroutine()
+{
     Task co_ret = coroutineFunction();
-    while(!co_ret.is_done()) {
+    while (!co_ret.is_done())
+    {
         std::cout << co_ret.get_value() << std::endl;
         co_ret.resume();
     }
     std::cout << "final: " << co_ret.get_value() << std::endl;
+}
+
+
+// Coroutine:Generator to generate 1 to 3
+struct Generator
+{
+    struct promise_type
+    {
+        Generator get_return_object()
+        {
+            return Generator{this};
+        }
+        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_always final_suspend() noexcept { return {}; }
+
+        std::suspend_always yield_value(int value)
+        {
+            value_ = value;
+            return {};
+        }
+
+        // void return_void() {}
+        void return_value(int value)
+        {
+            value_ = value;
+        }
+
+        void unhandled_exception() { std::exit(1); }
+
+        int value_;
+    };
+
+    Generator(promise_type *promise) : handle(std::coroutine_handle<promise_type>::from_promise(*promise)) {}
+    ~Generator()
+    {
+        // final_suspend *MUST* return std::suspend_always
+        if (handle)
+            handle.destroy();
+    }
+
+    int next()
+    {
+        handle.resume();
+        return handle.promise().value_;
+    }
+
+    bool is_done() { return handle.done(); }
+
+    std::coroutine_handle<promise_type> handle;
+};
+
+Generator gen()
+{
+    co_yield 1;
+    co_yield 2;
+    co_yield 3;
+    co_return -1;
+}
+
+void usage_generator()
+{
+    Generator g = gen();
+    while (!g.is_done())
+    {
+        std::cout << g.next() << std::endl;
+    }
+    std::cout << "done" << std::endl;
 }
 
 // ========== main ===========
@@ -123,7 +195,8 @@ int main()
     std::cout << "=== main begin ===" << std::endl;
 
     // usage_notification();
-    usage_hello_coroutine();
+    //usage_hello_coroutine();
+    usage_generator();
 
     std::cout << "=== main end ===" << std::endl;
     return 0;
